@@ -1,0 +1,47 @@
+name: Build Frost APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find project
+        run: |
+          for z in *.zip; do
+            if [ -f "$z" ]; then unzip -oq "$z"; fi
+          done
+          S=$(find . -maxdepth 3 -name settings.gradle.kts | head -1)
+          if [ -z "$S" ]; then
+            echo "Project not found. Files in repo:"
+            ls -R | head -80
+            exit 1
+          fi
+          echo "DIR=$(dirname "$S")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android 16 platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Build debug APK
+        working-directory: ${{ env.DIR }}
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Frost-apk
+          path: ${{ env.DIR }}/app/build/outputs/apk/debug/*.apk
